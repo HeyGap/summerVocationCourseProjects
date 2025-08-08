@@ -1,0 +1,74 @@
+{
+  "timestamp": "2025-08-08T08:31:06.009Z",
+  "system": {
+    "platform": "linux",
+    "nodeVersion": "v23.6.0",
+    "architecture": "x64"
+  },
+  "results": {
+    "Hash Computation": [
+      {
+        "test": "Hash Computation",
+        "size": 1,
+        "duration": "0.16ms",
+        "throughput": "6424.75 hashes/sec"
+      },
+      {
+        "test": "Hash Computation",
+        "size": 10,
+        "duration": "0.48ms",
+        "throughput": "21031.20 hashes/sec"
+      },
+      {
+        "test": "Hash Computation",
+        "size": 100,
+        "duration": "3.76ms",
+        "throughput": "26570.07 hashes/sec"
+      },
+      {
+        "test": "Hash Computation",
+        "size": 1000,
+        "duration": "26.85ms",
+        "throughput": "37242.37 hashes/sec"
+      }
+    ],
+    "Memory Usage": [
+      {
+        "test": "Memory Usage",
+        "iterations": 10000,
+        "heapUsedDiff": "0.62 MB",
+        "heapTotalDiff": "2.25 MB",
+        "externalDiff": "0.00 MB"
+      }
+    ],
+    "Parameter Comparison": [
+      {
+        "test": "Parameter Comparison",
+        "config": "(256,2,5)",
+        "stateWidth": 2,
+        "estimatedConstraints": 800,
+        "estimatedProvingTime": "2-5秒",
+        "estimatedMemory": "< 500MB"
+      },
+      {
+        "test": "Parameter Comparison",
+        "config": "(256,3,5)",
+        "stateWidth": 3,
+        "estimatedConstraints": 1200,
+        "estimatedProvingTime": "5-10秒",
+        "estimatedMemory": "< 1GB"
+      }
+    ],
+    "Security Analysis": [
+      {
+        "test": "Security Analysis",
+        "avalancheTest": {
+          "originalHash": "20102421064732085238...",
+          "modifiedHash": "17793165311566314319...",
+          "hammingWeight": 115,
+          "totalBits": 254
+        }
+      }
+    ]
+  }
+}
