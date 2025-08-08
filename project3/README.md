@@ -143,6 +143,173 @@ npm run verify         # 验证证明有效性
 | `npm run full-test` | 端到端完整测试 |
 | `npm run clean` | 清理编译输出 |
 
+## 算法与协议的数学基础
+
+### 1. Poseidon2 哈希算法数学原理
+
+#### 1.1 有限域基础
+Poseidon2 哈希算法基于有限域 $\mathbb{F}_p$ 上的运算，其中 $p$ 是 BN254 椭圆曲线的标量域素数：
+```
+p = 21888242871839275222246405745257275088548364400416034343698204186575808495617
+```
+
+**域运算定义:**
+- 加法: $(a + b) \bmod p$
+- 乘法: $(a \cdot b) \bmod p$  
+- 求幂: $a^n \bmod p$
+
+#### 1.2 Poseidon2 状态转换函数
+
+**状态表示:**
+设状态向量为 $\mathbf{s} = (s_0, s_1, \ldots, s_{t-1}) \in \mathbb{F}_p^t$，其中 $t=3$ 为状态宽度。
+
+**轮函数 $R$:**
+每个轮函数包含三个步骤：
+
+1. **轮常数添加 (AddRoundConstants):**
+   $$\mathbf{s} \leftarrow \mathbf{s} + \mathbf{C}^{(r)}$$
+   其中 $\mathbf{C}^{(r)} = (C_0^{(r)}, C_1^{(r)}, C_2^{(r)})$ 是第 $r$ 轮的轮常数。
+
+2. **S-box 变换 (SubWords):**
+   - **全轮**: $s_i \leftarrow s_i^5, \forall i \in \{0,1,2\}$
+   - **偏轮**: $s_0 \leftarrow s_0^5$，其他元素保持不变
+
+3. **线性混合 (MixLayer):**
+   $$\mathbf{s} \leftarrow \mathbf{M} \cdot \mathbf{s}$$
+
+**MDS 矩阵 $\mathbf{M}$:**
+```math
+\mathbf{M} = \begin{pmatrix}
+2 & 1 & 1 \\
+1 & 2 & 1 \\
+1 & 1 & 2
+\end{pmatrix}
+```
+
+#### 1.3 完整哈希过程
+
+**参数配置 (n,t,d) = (256,3,5):**
+- $n = 256$: 基于 254-bit 有限域
+- $t = 3$: 状态宽度
+- $d = 5$: S-box 度数
+- $R_F = 4$: 全轮数量 (前2轮 + 后2轮)
+- $R_P = 4$: 偏轮数量
+
+**哈希函数定义:**
+$$H: \mathbb{F}_p^2 \rightarrow \mathbb{F}_p$$
+
+对于输入 $(x_1, x_2)$：
+1. **初始化**: $\mathbf{s} = (x_1, x_2, 0)$
+2. **前置全轮**: $\mathbf{s} \leftarrow R_F(\mathbf{s})$ (2轮)
+3. **偏轮**: $\mathbf{s} \leftarrow R_P(\mathbf{s})$ (4轮)  
+4. **后置全轮**: $\mathbf{s} \leftarrow R_F(\mathbf{s})$ (2轮)
+5. **输出**: $H(x_1, x_2) = s_0$
+
+#### 1.4 安全性分析
+
+**抗代数攻击:**
+- S-box 度数 $d=5$ 提供充分的非线性度
+- 偏轮结构在保持安全性的同时降低约束数量
+
+**扩散性:**
+- MDS 矩阵保证最大分支数，确保良好的扩散特性
+- 分支数: $\text{Branch}(\mathbf{M}) = \min(\text{wt}(\mathbf{v}) + \text{wt}(\mathbf{M} \cdot \mathbf{v})) = 4$
+
+### 2. Groth16 零知识证明系统
+
+#### 2.1 双线性群设置
+
+**椭圆曲线群:**
+- $\mathbb{G}_1$: BN254 曲线上的点群，生成元 $G_1$
+- $\mathbb{G}_2$: BN254 扭曲曲线上的点群，生成元 $G_2$  
+- $\mathbb{G}_T$: 目标群，通过双线性映射 $e: \mathbb{G}_1 \times \mathbb{G}_2 \rightarrow \mathbb{G}_T$
+
+**双线性性质:**
+$$e(aP, bQ) = e(P, Q)^{ab}, \forall P \in \mathbb{G}_1, Q \in \mathbb{G}_2, a,b \in \mathbb{F}_p$$
+
+#### 2.2 R1CS 约束系统
+
+**约束形式:**
+对于见证向量 $\mathbf{w} = (1, x_1, x_2, \ldots, x_m) \in \mathbb{F}_p^{m+1}$，R1CS 约束定义为：
+$$(\mathbf{A} \cdot \mathbf{w}) \circ (\mathbf{B} \cdot \mathbf{w}) = (\mathbf{C} \cdot \mathbf{w})$$
+
+其中 $\mathbf{A}, \mathbf{B}, \mathbf{C} \in \mathbb{F}_p^{n \times (m+1)}$ 是约束矩阵，$\circ$ 表示逐元素乘积。
+
+**Poseidon2 约束分解:**
+- **S-box 约束**: $y = x^5$ 转换为约束 $(x^2) \circ (x^2) = x^4, x^4 \circ x = x^5$
+- **线性约束**: $y_i = \sum_j M_{ij} x_j$ 直接表示为线性约束
+- **总约束数**: 96个 (48线性 + 48非线性)
+
+#### 2.3 Groth16 证明结构
+
+**公共参考串 (CRS):**
+- **证明密钥**: $pk = (\{G_1^{\alpha}, G_1^{\beta}, G_2^{\beta}, G_1^{\delta}, G_2^{\delta}\}, \{G_1^{\frac{\beta u_i(x) + \alpha v_i(x) + w_i(x)}{\delta}}\})$
+- **验证密钥**: $vk = (G_1^{\alpha}, G_2^{\beta}, G_2^{\gamma}, G_2^{\delta}, \{G_1^{\frac{\beta u_i(x) + \alpha v_i(x) + w_i(x)}{\gamma}}\})$
+
+**证明三元组:**
+$$\pi = (A, B, C) \in \mathbb{G}_1 \times \mathbb{G}_2 \times \mathbb{G}_1$$
+
+**证明生成:**
+对于公共输入 $\mathbf{x} = (x_1, \ldots, x_\ell)$ 和见证 $\mathbf{w} = (w_1, \ldots, w_m)$：
+
+1. 选择随机数 $r, s \leftarrow \mathbb{F}_p$
+2. 计算:
+   $$A = G_1^{\alpha} \cdot G_1^{\sum_{i=0}^m a_i u_i(x)} \cdot G_1^{r \delta}$$
+   $$B = G_2^{\beta} \cdot G_2^{\sum_{i=0}^m a_i v_i(x)} \cdot G_2^{s \delta}$$  
+   $$C = G_1^{\frac{\sum_{i=\ell+1}^m a_i (\beta u_i(x) + \alpha v_i(x) + w_i(x))}{\delta}} \cdot G_1^{rs} \cdot A^s \cdot B^r$$
+
+**验证等式:**
+$$e(A, B) = e(G_1^{\alpha}, G_2^{\beta}) \cdot e(\sum_{i=1}^\ell x_i G_1^{\frac{\beta u_i(x) + \alpha v_i(x) + w_i(x)}{\gamma}}, G_2^{\gamma}) \cdot e(C, G_2^{\delta})$$
+
+### 3. 零知识性质的数学保证
+
+#### 3.1 完美零知识性
+
+**模拟器构造:**
+存在多项式时间模拟器 $\mathcal{S}$，对于任意语句 $x \in L$，模拟器输出的证明分布与真实证明分布计算不可区分：
+$$\{\mathcal{S}(x)\} \stackrel{c}{\equiv} \{\text{Prove}(pk, x, w): (x,w) \in R\}$$
+
+#### 3.2 完美可靠性
+
+**知识可提取性:**
+存在多项式时间提取器 $\mathcal{E}$，对于任意能生成有效证明的恶意证明者 $\mathcal{P}^*$，提取器能够提取出对应的见证：
+$$\Pr[\mathcal{E}(pk, x, \pi) \in R_L(x) : \pi \leftarrow \mathcal{P}^*(pk, x)] \geq \epsilon$$
+
+#### 3.3 简洁性证明
+
+**证明大小分析:**
+- $A \in \mathbb{G}_1$: 32字节 (压缩表示)
+- $B \in \mathbb{G}_2$: 64字节 (压缩表示)  
+- $C \in \mathbb{G}_1$: 32字节 (压缩表示)
+- **总大小**: 128字节，与电路规模无关
+
+### 4. 电路约束的数学优化
+
+#### 4.1 约束数量分析
+
+**S-box 约束分解:**
+对于 $y = x^5$，使用中间变量：
+- $t_1 = x^2$ (1个乘法约束)
+- $t_2 = t_1^2 = x^4$ (1个乘法约束)  
+- $y = t_2 \cdot x = x^5$ (1个乘法约束)
+
+每个 S-box 需要 3 个乘法约束。
+
+**总约束计算:**
+- 全轮 S-box: $4 \times 3 \times 3 = 36$个约束
+- 偏轮 S-box: $4 \times 3 \times 1 = 12$个约束  
+- 线性层约束: $8 \times 6 = 48$个线性约束
+- **总计**: $36 + 12 + 48 = 96$个约束
+
+#### 4.2 域元素表示优化
+
+**模数缩减优化:**
+利用 BN254 的特殊结构 $p = 36u^4 + 36u^3 + 24u^2 + 6u + 1$，其中 $u = 4965661367192848881$，实现高效的模数运算。
+
+**蒙哥马利形式:**
+将域元素表示为蒙哥马利形式以加速乘法运算：
+$$\text{Mont}(a) = a \cdot R \bmod p, \quad R = 2^{256}$$
+
 ## 技术创新
 
 ### 1. 高度优化的电路设计
