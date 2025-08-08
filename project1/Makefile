@@ -16,14 +16,15 @@ OBJ_DIR = $(BUILD_DIR)/obj
 BASIC_SRCS = $(SRC_DIR)/sm4_basic.c $(SRC_DIR)/utils.c
 TTABLE_SRCS = $(BASIC_SRCS) $(SRC_DIR)/sm4_ttable.c
 AESNI_SRCS = $(TTABLE_SRCS) $(SRC_DIR)/sm4_aesni.c
+GCM_SRCS = $(SRC_DIR)/sm4_gcm.c
 OPT_SRCS = $(SRC_DIR)/sm4_opt.c
 
 # 所有源文件
 ALL_SRCS = $(BASIC_SRCS) $(SRC_DIR)/sm4_ttable.c $(SRC_DIR)/sm4_aesni.c \
-           $(OPT_SRCS)
+           $(GCM_SRCS) $(OPT_SRCS)
 
 # 测试源文件
-TEST_SRCS = $(TEST_DIR)/test_sm4.c
+TEST_SRCS = $(TEST_DIR)/test_sm4.c $(TEST_DIR)/test_gcm.c
 BENCHMARK_SRCS = $(TEST_DIR)/benchmark.c
 
 # 示例源文件
@@ -88,6 +89,12 @@ BASIC_CFLAGS = $(CFLAGS) -DSM4_BASIC_ONLY
 TTABLE_CFLAGS = $(CFLAGS) -DSM4_ENABLE_TTABLE
 AESNI_CFLAGS = $(TTABLE_CFLAGS) -DSM4_ENABLE_AESNI -maes -msse4.1
 
+# GCM 特定选项
+GCM_CFLAGS = $(CFLAGS) -DSM4_ENABLE_GCM
+ifneq ($(HAS_VPCLMULQDQ),)
+    GCM_CFLAGS += -mpclmul -DSM4_HAS_PCLMULQDQ
+endif
+
 # 默认目标
 .PHONY: all
 all: info libs tests
@@ -127,6 +134,10 @@ else
 	$(CC) $(TTABLE_CFLAGS) -DSM4_NO_AESNI -c $< -o $@
 endif
 
+# 编译规则 - GCM 模式
+$(OBJ_DIR)/sm4_gcm.o: $(SRC_DIR)/sm4_gcm.c | $(OBJ_DIR)
+	$(CC) $(GCM_CFLAGS) -c $< -o $@
+
 # 编译规则 - 优化框架
 $(OBJ_DIR)/sm4_opt.o: $(SRC_DIR)/sm4_opt.c | $(OBJ_DIR)
 	$(CC) $(AESNI_CFLAGS) -DSM4_ENABLE_ALL -c $< -o $@
@@ -150,11 +161,14 @@ $(BUILD_DIR)/libsm4_full.a: $(ALL_OBJS) | $(BUILD_DIR)
 
 # 测试程序
 .PHONY: tests
-tests: $(BUILD_DIR)/test_sm4$(EXEC_EXT) \
+tests: $(BUILD_DIR)/test_sm4$(EXEC_EXT) $(BUILD_DIR)/test_gcm$(EXEC_EXT) \
        $(BUILD_DIR)/benchmark$(EXEC_EXT)
 
 $(BUILD_DIR)/test_sm4$(EXEC_EXT): $(TEST_DIR)/test_sm4.c $(BUILD_DIR)/libsm4_full.a | $(BUILD_DIR)
 	$(CC) $(AESNI_CFLAGS) -DSM4_ENABLE_ALL $< -L$(BUILD_DIR) -lsm4_full -o $@ $(LDFLAGS)
+
+$(BUILD_DIR)/test_gcm$(EXEC_EXT): $(TEST_DIR)/test_gcm.c $(BUILD_DIR)/libsm4_full.a | $(BUILD_DIR)
+	$(CC) $(GCM_CFLAGS) -DSM4_ENABLE_ALL $< -L$(BUILD_DIR) -lsm4_full -o $@ $(LDFLAGS)
 
 $(BUILD_DIR)/benchmark$(EXEC_EXT): $(TEST_DIR)/benchmark.c $(BUILD_DIR)/libsm4_full.a | $(BUILD_DIR)
 	$(CC) $(AESNI_CFLAGS) -DSM4_ENABLE_ALL $< -L$(BUILD_DIR) -lsm4_full -o $@ $(LDFLAGS)
@@ -167,6 +181,9 @@ $(BUILD_DIR)/encrypt_file$(EXEC_EXT): $(EXAMPLE_DIR)/encrypt_file.c $(BUILD_DIR)
 test: tests
 	@echo "Running SM4 tests..."
 	@$(BUILD_DIR)/test_sm4$(EXEC_EXT)
+	@echo ""
+	@echo "Running GCM tests..."
+	@$(BUILD_DIR)/test_gcm$(EXEC_EXT)
 
 # 运行基准测试
 .PHONY: benchmark

@@ -19,6 +19,16 @@ typedef struct {
     int encrypt;              // 加密标志: 1=加密, 0=解密
 } sm4_context;
 
+// GCM 上下文结构
+typedef struct {
+    sm4_context sm4_ctx;
+    unsigned char H[16]; // Hash subkey
+    unsigned char Y[16]; // Counter
+    unsigned char T[16]; // Tag
+    size_t aad_len;
+    size_t text_len;
+} gcm_context;
+
 // 基本接口函数
 
 /**
@@ -77,6 +87,42 @@ int sm4_crypt_cbc(const sm4_context *ctx, int mode, size_t length,
 int sm4_crypt_ctr(const sm4_context *ctx, size_t length, size_t *nc_off,
                   uint8_t nonce_counter[SM4_BLOCK_SIZE], uint8_t stream_block[SM4_BLOCK_SIZE],
                   const uint8_t *input, uint8_t *output);
+
+/**
+ * SM4 GCM模式初始化
+ * @param ctx GCM上下文
+ * @param key 128位密钥
+ */
+void sm4_gcm_init(gcm_context *ctx, const unsigned char *key);
+
+/**
+ * SM4 GCM模式AAD数据更新
+ * @param ctx GCM上下文
+ * @param aad AAD数据
+ * @param aad_len AAD数据长度
+ */
+void sm4_gcm_update_aad(gcm_context *ctx, const unsigned char *aad, size_t aad_len);
+
+/**
+ * SM4 GCM模式加密/解密
+ * @param ctx GCM上下文
+ * @param mode 1=加密, 0=解密
+ * @param length 数据长度
+ * @param iv 初始化向量
+ * @param input 输入数据
+ * @param output 输出数据
+ * @return 0=成功, -1=失败
+ */
+int sm4_gcm_crypt(gcm_context *ctx, int mode, size_t length, const unsigned char *iv,
+                  const unsigned char *input, unsigned char *output);
+
+/**
+ * SM4 GCM模式结束，生成标签
+ * @param ctx GCM上下文
+ * @param tag 标签输出
+ * @param tag_len 标签长度
+ */
+void sm4_gcm_finish(gcm_context *ctx, unsigned char *tag, size_t tag_len);
 
 // 内部函数声明（可被优化版本重写）
 

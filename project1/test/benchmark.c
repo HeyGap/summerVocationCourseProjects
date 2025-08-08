@@ -1,3 +1,4 @@
+#include "../include/sm4.h"
 #include "../include/sm4_opt.h"
 #include "../include/utils.h"
 #include <stdio.h>
@@ -236,6 +237,50 @@ static void benchmark_sm4_ctr(void) {
     free(output_data);
 }
 
+// SM4 GCM模式基准测试
+static void benchmark_sm4_gcm(void) {
+    printf("=== SM4 GCM Mode Benchmark ===\n");
+
+    uint8_t key[16];
+    generate_random_key(key);
+
+    uint8_t iv[12];
+    generate_random(iv, 12);
+
+    uint8_t *input_data = malloc(BENCHMARK_DATA_SIZE);
+    uint8_t *output_data = malloc(BENCHMARK_DATA_SIZE);
+
+    if (input_data == NULL || output_data == NULL) {
+        printf("Failed to allocate benchmark data\n");
+        free(input_data);
+        free(output_data);
+        return;
+    }
+
+    generate_random(input_data, BENCHMARK_DATA_SIZE);
+
+    gcm_context gcm_ctx;
+    sm4_gcm_init(&gcm_ctx, key);
+
+    timestamp_t start, end, diff;
+    get_timestamp(&start);
+
+    for (int i = 0; i < BENCHMARK_ITERATIONS; i++) {
+        sm4_gcm_crypt(&gcm_ctx, 1, BENCHMARK_DATA_SIZE, iv, input_data, output_data);
+    }
+
+    get_timestamp(&end);
+    calc_time_diff(&start, &end, &diff);
+
+    double total_time = diff.seconds;
+    double mbps = (BENCHMARK_DATA_SIZE * BENCHMARK_ITERATIONS / (1024.0 * 1024.0)) / total_time;
+
+    printf("  SM4-GCM: %.2f MB/s\n\n", mbps);
+
+    free(input_data);
+    free(output_data);
+}
+
 // 不同数据大小的性能测试
 static void benchmark_different_sizes(void) {
     printf("=== Performance vs Data Size ===\n");
@@ -324,6 +369,7 @@ int main(void) {
     // 运行基准测试
     benchmark_sm4_ecb();
     benchmark_sm4_ctr();
+    benchmark_sm4_gcm();
     benchmark_different_sizes();
     
     printf("=== Benchmark Complete ===\n");
