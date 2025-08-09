@@ -15,7 +15,11 @@ class SM2:
         vk = sk.verifying_key
         return sk, vk
 
-    def encrypt(self, vk: VerifyingKey, plaintext: bytes) -> bytes:
+    def encrypt(self, vk: VerifyingKey, plaintext) -> bytes:
+        # 确保输入是字节类型
+        if isinstance(plaintext, str):
+            plaintext = plaintext.encode('utf-8')
+        
         # 简化版：用ECC密钥做ECDH派生对称密钥，然后AES加密（实际SM2有C1C3C2结构）
         # 这里只做演示
         shared = vk.to_string()[:16]  # 取前16字节做对称密钥（不安全，仅演示）
@@ -26,22 +30,29 @@ class SM2:
         ciphertext = cipher.encrypt(pad(plaintext, 16))
         return iv + ciphertext
 
-    def decrypt(self, sk: SigningKey, ciphertext: bytes) -> bytes:
+    def decrypt(self, sk: SigningKey, ciphertext: bytes) -> str:
         shared = sk.verifying_key.to_string()[:16]
         from Crypto.Cipher import AES
         from Crypto.Util.Padding import unpad
         iv = ciphertext[:16]
         ct = ciphertext[16:]
         cipher = AES.new(shared, AES.MODE_CBC, iv)
-        return unpad(cipher.decrypt(ct), 16)
+        plaintext = unpad(cipher.decrypt(ct), 16)
+        return plaintext.decode('utf-8')
 
-    def sign(self, sk: SigningKey, data: bytes) -> bytes:
+    def sign(self, sk: SigningKey, data) -> bytes:
+        # 确保输入是字节类型
+        if isinstance(data, str):
+            data = data.encode('utf-8')
         return sk.sign(data, hashfunc=sha256)
 
-    def verify(self, vk: VerifyingKey, data: bytes, signature: bytes) -> bool:
+    def verify(self, vk: VerifyingKey, data, signature: bytes) -> bool:
+        # 确保输入是字节类型
+        if isinstance(data, str):
+            data = data.encode('utf-8')
         try:
             return vk.verify(signature, data, hashfunc=sha256)
-        except Exception:
+        except:
             return False
 
 if __name__ == "__main__":

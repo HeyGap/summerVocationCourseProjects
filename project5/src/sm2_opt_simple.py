@@ -33,6 +33,7 @@ class SM2OptimizedSimple:
         
         # 缓存
         self.key_cache = weakref.WeakValueDictionary() if enable_cache else None
+        self.verification_cache = {} if enable_cache else None
         self._thread_pool = None
         
         # 性能统计
@@ -80,12 +81,16 @@ class SM2OptimizedSimple:
         
         return sk, vk
     
-    def encrypt(self, vk: VerifyingKey, plaintext: bytes) -> bytes:
+    def encrypt(self, vk: VerifyingKey, plaintext) -> bytes:
         """优化的加密实现"""
         self.stats['encryptions'] += 1
         
+        # 确保输入是字节类型
+        if isinstance(plaintext, str):
+            plaintext = plaintext.encode('utf-8')
+        
         # 生成临时密钥对
-        temp_sk = SigningKey.generate(curve=self.curve)
+        temp_sk, temp_vk = self.generate_keypair()
         
         # 计算共享密钥 (ECDH)
         shared_point = temp_sk.privkey.secret_multiplier * vk.pubkey.point
@@ -104,7 +109,7 @@ class SM2OptimizedSimple:
         c1 = temp_sk.verifying_key.to_string()  # 临时公钥
         return c1 + iv + tag + ciphertext
     
-    def decrypt(self, sk: SigningKey, ciphertext: bytes) -> bytes:
+    def decrypt(self, sk: SigningKey, ciphertext: bytes) -> str:
         """优化的解密实现"""
         self.stats['decryptions'] += 1
         
@@ -129,11 +134,15 @@ class SM2OptimizedSimple:
         
         cipher = AES.new(aes_key, AES.MODE_GCM, nonce=iv)
         plaintext = cipher.decrypt_and_verify(c2, tag)
-        return unpad(plaintext, 16)
+        return unpad(plaintext, 16).decode('utf-8')
     
-    def sign(self, sk: SigningKey, data: bytes) -> bytes:
+    def sign(self, sk: SigningKey, data) -> bytes:
         """优化的签名实现"""
         self.stats['signatures'] += 1
+        
+        # 确保输入是字节类型
+        if isinstance(data, str):
+            data = data.encode('utf-8')
         
         # 使用确定性k值生成（RFC 6979）
         h = self._cached_hash(data)
@@ -161,14 +170,28 @@ class SM2OptimizedSimple:
             k = hmac.new(k, v + b'\x00', hashlib.sha256).digest()
             v = hmac.new(k, v, hashlib.sha256).digest()
     
-    def verify(self, vk: VerifyingKey, data: bytes, signature: bytes) -> bool:
-        """优化的验签实现"""
+    def verify(self, vk: VerifyingKey, data, signature: bytes) -> bool:
+        """优化的验证实现"""
         self.stats['verifications'] += 1
+        
+        # 确保输入是字节类型
+        if isinstance(data, str):
+            data = data.encode('utf-8')
+        
+        # 检查缓存
+        cache_key = (vk.to_string(), data, signature)
+        if cache_key in self.verification_cache:
+            self.stats['cache_hits'] += 1
+            return self.verification_cache[cache_key]
         
         try:
             h = self._cached_hash(data)
-            return vk.verify_digest(signature, h)
-        except Exception:
+            result = vk.verify_digest(signature, h)
+            
+            # 缓存结果
+            self.verification_cache[cache_key] = result
+            return result
+        except:
             return False
     
     def batch_verify(self, verifications: List[Tuple[VerifyingKey, bytes, bytes]]) -> List[bool]:
