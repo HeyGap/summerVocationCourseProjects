@@ -33,13 +33,20 @@ build/obj/sm3_multiway.o: src/sm3_multiway.c include/sm3_opt.h | build/obj
 build/obj/sm3_benchmark.o: src/sm3_benchmark.c include/sm3_opt.h | build/obj
 	$(CC) $(CFLAGS) $(SIMD_FLAGS) $(INCLUDES) -c src/sm3_benchmark.c -o build/obj/sm3_benchmark.o
 
-build/libsm3_opt.a: build/obj/sm3.o build/obj/sm3_opt.o build/obj/sm3_multiway.o build/obj/sm3_benchmark.o
+build/obj/sm3_fast.o: src/sm3_fast.c include/sm3_opt.h | build/obj
+	$(CC) $(CFLAGS) $(SIMD_FLAGS) $(INCLUDES) -c src/sm3_fast.c -o build/obj/sm3_fast.o
+
+build/libsm3_opt.a: build/obj/sm3.o build/obj/sm3_opt.o build/obj/sm3_multiway.o build/obj/sm3_benchmark.o build/obj/sm3_fast.o
 	mkdir -p build
-	ar rcs build/libsm3_opt.a build/obj/sm3.o build/obj/sm3_opt.o build/obj/sm3_multiway.o build/obj/sm3_benchmark.o
+	ar rcs build/libsm3_opt.a build/obj/sm3.o build/obj/sm3_opt.o build/obj/sm3_multiway.o build/obj/sm3_benchmark.o build/obj/sm3_fast.o
 
 build/test_sm3_opt: test/test_sm3_opt.c build/libsm3_opt.a
 	mkdir -p build
 	$(CC) $(CFLAGS) $(SIMD_FLAGS) $(INCLUDES) test/test_sm3_opt.c -Lbuild -lsm3_opt -o build/test_sm3_opt
+
+build/simple_perf_test: test/simple_perf_test.c build/libsm3_opt.a
+	mkdir -p build
+	$(CC) $(CFLAGS) $(SIMD_FLAGS) $(INCLUDES) test/simple_perf_test.c -Lbuild -lsm3_opt -o build/simple_perf_test
 
 test: build/test_sm3
 	./build/test_sm3
@@ -47,6 +54,10 @@ test: build/test_sm3
 # 优化版本测试
 test-opt: build/test_sm3_opt
 	./build/test_sm3_opt --all
+
+# 简单性能测试
+test-perf: build/simple_perf_test
+	./build/simple_perf_test
 
 benchmark: build/test_sm3_opt
 	./build/test_sm3_opt --bench

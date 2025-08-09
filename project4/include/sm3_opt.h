@@ -139,6 +139,24 @@ int sm3_verify_optimizations(void);
 void* sm3_aligned_alloc(size_t size, size_t alignment);
 void sm3_aligned_free(void* ptr);
 
+/* ========== 高性能快速实现 ========== */
+
+/**
+ * 高效的SM3哈希计算（智能选择优化策略）
+ * 对小数据使用基础实现避免SIMD开销，对大数据使用批量优化
+ */
+void sm3_fast_hash(const uint8_t *data, size_t len, uint8_t *digest);
+
+/**
+ * 真正高效的4路并行哈希计算
+ */
+void sm3_hash_4way_parallel(const uint8_t *data1, size_t len1,
+                           const uint8_t *data2, size_t len2,
+                           const uint8_t *data3, size_t len3,
+                           const uint8_t *data4, size_t len4,
+                           uint8_t *digest1, uint8_t *digest2,
+                           uint8_t *digest3, uint8_t *digest4);
+
 #ifdef __cplusplus
 }
 #endif

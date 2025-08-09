@@ -50,42 +50,100 @@ void test_optimization_comparison() {
                            "We will test various SIMD optimizations including SSE2 and AVX2 implementations.";
     
     size_t len = strlen(test_data);
-    const uint8_t *data = (const uint8_t*)test_data;
+    printf("测试数据长度: %zu 字节\n\n", len);
     
     uint8_t digest_basic[SM3_DIGEST_SIZE];
     uint8_t digest_sse2[SM3_DIGEST_SIZE];
     uint8_t digest_avx2[SM3_DIGEST_SIZE];
     uint8_t digest_auto[SM3_DIGEST_SIZE];
+    uint8_t digest_fast[SM3_DIGEST_SIZE];  // 新增快速实现测试
     
-    printf("测试数据长度: %zu 字节\n\n", len);
+    // 基础实现
+    sm3_hash((const uint8_t*)test_data, len, digest_basic);
     
-    // 测试不同实现
-    sm3_hash(data, len, digest_basic);
-    sm3_opt_hash(data, len, digest_sse2, SM3_IMPL_SSE2);
-    sm3_opt_hash(data, len, digest_avx2, SM3_IMPL_AVX2);
-    sm3_opt_hash(data, len, digest_auto, SM3_IMPL_AUTO);
+    // 优化实现测试
+    sm3_opt_hash((const uint8_t*)test_data, len, digest_sse2, SM3_IMPL_SSE2);
+    sm3_opt_hash((const uint8_t*)test_data, len, digest_avx2, SM3_IMPL_AVX2);
+    sm3_opt_hash((const uint8_t*)test_data, len, digest_auto, SM3_IMPL_AUTO);
+    
+    // 快速实现测试
+    sm3_fast_hash((const uint8_t*)test_data, len, digest_fast);
     
     printf("基础实现结果: ");
     sm3_print_digest(digest_basic);
+    printf("\n");
     
     printf("SSE2优化结果: ");
     sm3_print_digest(digest_sse2);
+    printf("\n");
     
     printf("AVX2优化结果: ");
     sm3_print_digest(digest_avx2);
+    printf("\n");
     
     printf("自动选择结果: ");
     sm3_print_digest(digest_auto);
+    printf("\n");
     
-    // 验证结果一致性
-    int sse2_ok = memcmp(digest_basic, digest_sse2, SM3_DIGEST_SIZE) == 0;
-    int avx2_ok = memcmp(digest_basic, digest_avx2, SM3_DIGEST_SIZE) == 0;
-    int auto_ok = memcmp(digest_basic, digest_auto, SM3_DIGEST_SIZE) == 0;
+    printf("快速实现结果: ");
+    sm3_print_digest(digest_fast);
+    printf("\n");
     
     printf("\n结果验证:\n");
-    printf("  SSE2优化: %s\n", sse2_ok ? "✓ 正确" : "✗ 错误");
-    printf("  AVX2优化: %s\n", avx2_ok ? "✓ 正确" : "✗ 错误");
-    printf("  自动选择: %s\n", auto_ok ? "✓ 正确" : "✗ 错误");
+    printf("  SSE2优化: %s\n", memcmp(digest_basic, digest_sse2, SM3_DIGEST_SIZE) == 0 ? "✓ 正确" : "✗ 错误");
+    printf("  AVX2优化: %s\n", memcmp(digest_basic, digest_avx2, SM3_DIGEST_SIZE) == 0 ? "✓ 正确" : "✗ 错误");
+void test_optimization_comparison() {
+    printf("=== 优化实现比较测试 ===\n");
+    
+    const char *test_data = "这是一个用于测试SM3哈希算法优化实现的较长文本字符串，"
+                           "它包含了中文字符和英文字符，用于验证不同SIMD优化版本的正确性和性能。"
+                           "We will test various SIMD optimizations including SSE2 and AVX2 implementations.";
+    
+    size_t len = strlen(test_data);
+    printf("测试数据长度: %zu 字节\n\n", len);
+    
+    uint8_t digest_basic[SM3_DIGEST_SIZE];
+    uint8_t digest_sse2[SM3_DIGEST_SIZE];
+    uint8_t digest_avx2[SM3_DIGEST_SIZE];
+    uint8_t digest_auto[SM3_DIGEST_SIZE];
+    uint8_t digest_fast[SM3_DIGEST_SIZE];  // 新增快速实现测试
+    
+    // 基础实现
+    sm3_hash((const uint8_t*)test_data, len, digest_basic);
+    
+    // 优化实现测试
+    sm3_opt_hash((const uint8_t*)test_data, len, digest_sse2, SM3_IMPL_SSE2);
+    sm3_opt_hash((const uint8_t*)test_data, len, digest_avx2, SM3_IMPL_AVX2);
+    sm3_opt_hash((const uint8_t*)test_data, len, digest_auto, SM3_IMPL_AUTO);
+    
+    // 快速实现测试
+    sm3_fast_hash((const uint8_t*)test_data, len, digest_fast);
+    
+    printf("基础实现结果: ");
+    sm3_print_digest(digest_basic);
+    printf("\n");
+    
+    printf("SSE2优化结果: ");
+    sm3_print_digest(digest_sse2);
+    printf("\n");
+    
+    printf("AVX2优化结果: ");
+    sm3_print_digest(digest_avx2);
+    printf("\n");
+    
+    printf("自动选择结果: ");
+    sm3_print_digest(digest_auto);
+    printf("\n");
+    
+    printf("快速实现结果: ");
+    sm3_print_digest(digest_fast);
+    printf("\n");
+    
+    printf("\n结果验证:\n");
+    printf("  SSE2优化: %s\n", memcmp(digest_basic, digest_sse2, SM3_DIGEST_SIZE) == 0 ? "✓ 正确" : "✗ 错误");
+    printf("  AVX2优化: %s\n", memcmp(digest_basic, digest_avx2, SM3_DIGEST_SIZE) == 0 ? "✓ 正确" : "✗ 错误");
+    printf("  自动选择: %s\n", memcmp(digest_basic, digest_auto, SM3_DIGEST_SIZE) == 0 ? "✓ 正确" : "✗ 错误");
+    printf("  快速实现: %s\n", memcmp(digest_basic, digest_fast, SM3_DIGEST_SIZE) == 0 ? "✓ 正确" : "✗ 错误");
 }
 
 void test_multiway_parallel() {
@@ -114,14 +172,14 @@ void test_multiway_parallel() {
         sm3_print_digest(digest_serial[i]);
     }
     
-    // 并行计算
+    // 并行计算 - 使用新的高效实现
     printf("\n4路并行计算结果:\n");
-    sm3_hash_4way_avx2((const uint8_t*)data_streams[0], lengths[0],
-                       (const uint8_t*)data_streams[1], lengths[1],
-                       (const uint8_t*)data_streams[2], lengths[2],
-                       (const uint8_t*)data_streams[3], lengths[3],
-                       digest_parallel[0], digest_parallel[1],
-                       digest_parallel[2], digest_parallel[3]);
+    sm3_hash_4way_parallel((const uint8_t*)data_streams[0], lengths[0],
+                          (const uint8_t*)data_streams[1], lengths[1],
+                          (const uint8_t*)data_streams[2], lengths[2],
+                          (const uint8_t*)data_streams[3], lengths[3],
+                          digest_parallel[0], digest_parallel[1],
+                          digest_parallel[2], digest_parallel[3]);
     
     for (int i = 0; i < 4; i++) {
         printf("流%d: ", i + 1);
