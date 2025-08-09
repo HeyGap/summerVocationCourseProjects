@@ -1,122 +1,60 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c99 -O2 -g
+CFLAGS = -Wall -Wextra -std=c99 -O3 -g
+SIMD_FLAGS = -msse2 -mavx2 -march=native
 INCLUDES = -Iinclude
-SRCDIR = src
-TESTDIR = test
-BUILDDIR = build
-OBJDIR = $(BUILDDIR)/obj
 
-# 源文件
-SOURCES = $(SRCDIR)/sm3.c
-OBJECTS = $(OBJDIR)/sm3.o
+# 基础目标
+all: build/libsm3.a build/test_sm3
 
-# 测试文件
-TEST_SOURCES = $(TESTDIR)/test_sm3.c
-BENCHMARK_SOURCES = $(TESTDIR)/benchmark.c
+# 优化目标
+opt: build/libsm3_opt.a build/test_sm3_opt
 
-# 目标文件
-TARGETS = $(BUILDDIR)/test_sm3 $(BUILDDIR)/benchmark $(BUILDDIR)/example
+build/obj:
+	mkdir -p build/obj
 
-# 库文件
-LIBSM3 = $(BUILDDIR)/libsm3.a
+build/obj/sm3.o: src/sm3.c include/sm3.h | build/obj
+	$(CC) $(CFLAGS) $(INCLUDES) -c src/sm3.c -o build/obj/sm3.o
 
-.PHONY: all clean test benchmark lib help example
+build/libsm3.a: build/obj/sm3.o
+	mkdir -p build
+	ar rcs build/libsm3.a build/obj/sm3.o
 
-# 默认目标
-all: $(TARGETS) $(LIBSM3)
+build/test_sm3: test/test_sm3.c build/libsm3.a
+	mkdir -p build
+	$(CC) $(CFLAGS) $(INCLUDES) test/test_sm3.c -Lbuild -lsm3 -o build/test_sm3
 
-# 创建目录
-$(OBJDIR):
-	mkdir -p $(OBJDIR)
+# 优化版本编译规则
+build/obj/sm3_opt.o: src/sm3_opt.c include/sm3_opt.h include/sm3.h | build/obj
+	$(CC) $(CFLAGS) $(SIMD_FLAGS) $(INCLUDES) -c src/sm3_opt.c -o build/obj/sm3_opt.o
 
-$(BUILDDIR):
-	mkdir -p $(BUILDDIR)
+build/obj/sm3_multiway.o: src/sm3_multiway.c include/sm3_opt.h | build/obj
+	$(CC) $(CFLAGS) $(SIMD_FLAGS) $(INCLUDES) -c src/sm3_multiway.c -o build/obj/sm3_multiway.o
 
-# 编译源文件
-$(OBJDIR)/sm3.o: $(SRCDIR)/sm3.c include/sm3.h | $(OBJDIR)
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+build/obj/sm3_benchmark.o: src/sm3_benchmark.c include/sm3_opt.h | build/obj
+	$(CC) $(CFLAGS) $(SIMD_FLAGS) $(INCLUDES) -c src/sm3_benchmark.c -o build/obj/sm3_benchmark.o
 
-# 创建静态库
-$(LIBSM3): $(OBJECTS) | $(BUILDDIR)
-	ar rcs $@ $(OBJECTS)
-	ranlib $@
+build/libsm3_opt.a: build/obj/sm3.o build/obj/sm3_opt.o build/obj/sm3_multiway.o build/obj/sm3_benchmark.o
+	mkdir -p build
+	ar rcs build/libsm3_opt.a build/obj/sm3.o build/obj/sm3_opt.o build/obj/sm3_multiway.o build/obj/sm3_benchmark.o
 
-# 编译测试程序
-$(BUILDDIR)/test_sm3: $(TEST_SOURCES) $(LIBSM3) | $(BUILDDIR)
-	$(CC) $(CFLAGS) $(INCLUDES) $< -L$(BUILDDIR) -lsm3 -o $@
+build/test_sm3_opt: test/test_sm3_opt.c build/libsm3_opt.a
+	mkdir -p build
+	$(CC) $(CFLAGS) $(SIMD_FLAGS) $(INCLUDES) test/test_sm3_opt.c -Lbuild -lsm3_opt -o build/test_sm3_opt
 
-# 编译性能测试程序
-$(BUILDDIR)/benchmark: $(BENCHMARK_SOURCES) $(LIBSM3) | $(BUILDDIR)
-	$(CC) $(CFLAGS) $(INCLUDES) $< -L$(BUILDDIR) -lsm3 -o $@
+test: build/test_sm3
+	./build/test_sm3
 
-# 编译示例程序
-$(BUILDDIR)/example: example.c $(LIBSM3) | $(BUILDDIR)
-	$(CC) $(CFLAGS) $(INCLUDES) $< -L$(BUILDDIR) -lsm3 -o $@
+# 优化版本测试
+test-opt: build/test_sm3_opt
+	./build/test_sm3_opt --all
 
-# 运行测试
-test: $(BUILDDIR)/test_sm3
-	@echo "运行SM3测试..."
-	./$(BUILDDIR)/test_sm3
+benchmark: build/test_sm3_opt
+	./build/test_sm3_opt --bench
 
-# 运行性能测试
-benchmark: $(BUILDDIR)/benchmark
-	@echo "运行SM3性能测试..."
-	./$(BUILDDIR)/benchmark
+simd-info: build/test_sm3_opt
+	./build/test_sm3_opt | head -10
 
-# 运行示例程序
-example: $(BUILDDIR)/example
-	@echo "运行SM3示例程序..."
-	./$(BUILDDIR)/example
-
-# 编译库
-lib: $(LIBSM3)
-
-# 安装库和头文件（可选）
-install: $(LIBSM3)
-	@echo "安装库和头文件..."
-	sudo cp $(LIBSM3) /usr/local/lib/
-	sudo cp include/sm3.h /usr/local/include/
-	sudo ldconfig
-
-# 清理编译文件
 clean:
-	rm -rf $(BUILDDIR)
+	rm -rf build
 
-# 显示帮助信息
-help:
-	@echo "SM3哈希算法 Makefile"
-	@echo ""
-	@echo "可用目标:"
-	@echo "  all        - 编译所有目标（默认）"
-	@echo "  lib        - 编译静态库"
-	@echo "  test       - 编译并运行测试程序"
-	@echo "  benchmark  - 编译并运行性能测试"
-	@echo "  example    - 编译并运行示例程序"
-	@echo "  install    - 安装库和头文件到系统目录"
-	@echo "  clean      - 清理编译文件"
-	@echo "  help       - 显示此帮助信息"
-	@echo ""
-	@echo "编译选项:"
-	@echo "  DEBUG=1    - 启用调试模式"
-	@echo "  OPTIMIZE=0 - 禁用优化"
-	@echo ""
-	@echo "示例:"
-	@echo "  make all"
-	@echo "  make test"
-	@echo "  make DEBUG=1 test"
-	@echo "  make clean"
-
-# 调试模式
-ifdef DEBUG
-CFLAGS += -DDEBUG -O0
-endif
-
-# 优化选项
-ifdef OPTIMIZE
-ifeq ($(OPTIMIZE),0)
-CFLAGS = $(filter-out -O2,$(CFLAGS)) -O0
-endif
-endif
-
-# 依赖关系
-$(OBJECTS): include/sm3.h
+.PHONY: all opt test test-opt benchmark simd-info clean
