@@ -158,5 +158,3 @@ make opt-test
 - **编译器**: 需要GCC 4.9+或Clang 3.7+
 - **操作系统**: Linux、macOS、Windows (MinGW)
 - **架构**: x86-64 (ARM版本在开发中)
-
-
