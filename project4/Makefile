@@ -4,16 +4,34 @@ SIMD_FLAGS = -msse2 -mavx2 -march=native
 INCLUDES = -Iinclude
 
 # 基础目标
-all: build/libsm3.a build/test_sm3 build/length_extension_attack build/simple_attack_demo
+all: build/libsm3.a build/test_sm3 build/length_extension_attack build/simple_attack_demo build/test_merkle_tree
 
 # 优化目标
 opt: build/libsm3_opt.a build/test_sm3_opt
+
+build/merkle_demo: merkle_demo.c build/libsm3_merkle.a
+	mkdir -p build
+	$(CC) $(CFLAGS) $(INCLUDES) merkle_demo.c -Lbuild -lsm3_merkle -lm -o build/merkle_demo
+
+# Merkle树目标
+merkle: build/test_merkle_tree build/merkle_demo
 
 build/obj:
 	mkdir -p build/obj
 
 build/obj/sm3.o: src/sm3.c include/sm3.h | build/obj
 	$(CC) $(CFLAGS) $(INCLUDES) -c src/sm3.c -o build/obj/sm3.o
+
+build/obj/merkle_tree.o: src/merkle_tree.c include/merkle_tree.h include/sm3.h | build/obj
+	$(CC) $(CFLAGS) $(INCLUDES) -c src/merkle_tree.c -o build/obj/merkle_tree.o
+
+build/libsm3_merkle.a: build/obj/sm3.o build/obj/merkle_tree.o
+	mkdir -p build
+	ar rcs build/libsm3_merkle.a build/obj/sm3.o build/obj/merkle_tree.o
+
+build/test_merkle_tree: test_merkle_tree.c build/libsm3_merkle.a
+	mkdir -p build
+	$(CC) $(CFLAGS) $(INCLUDES) test_merkle_tree.c -Lbuild -lsm3_merkle -lm -o build/test_merkle_tree
 
 build/libsm3.a: build/obj/sm3.o
 	mkdir -p build
@@ -81,7 +99,19 @@ benchmark: build/test_sm3_opt
 simd-info: build/test_sm3_opt
 	./build/test_sm3_opt | head -10
 
+build/verify_merkle: verify_merkle.c build/libsm3_merkle.a
+	mkdir -p build
+	$(CC) $(CFLAGS) $(INCLUDES) verify_merkle.c -Lbuild -lsm3_merkle -lm -o build/verify_merkle
+
+# Merkle树验证测试
+verify-merkle: build/verify_merkle
+	./build/verify_merkle
+
+# Merkle树测试
+test-merkle: build/test_merkle_tree
+	./build/test_merkle_tree
+
 clean:
 	rm -rf build
 
-.PHONY: all opt test attack demo test-opt benchmark simd-info clean
+.PHONY: all opt merkle test attack demo test-opt benchmark simd-info test-merkle demo-merkle verify-merkle clean

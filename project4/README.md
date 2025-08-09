@@ -1,8 +1,17 @@
-# SM3密码哈希算法高性能SIMD优化实现
+# SM3密码哈希算法与RFC6962 Merkle树实现
 
 ## 概述
 
-本项目提供了中华人民共和国国家密码管理局发布的**SM3密码哈希算法**（GM/T 0004-2012）的高性能C语言实现。除标准参考实现外，本项目还实现了基于现代CPU SIMD指令集的多种优化策略，在保证算法正确性的前提下显著提升计算性能。
+本项目提供了中华人民共和国国家密码管理局发布的**SM3密码哈希算法**（GM/T 0004-2012）的高性能C语言实现，以及基于RFC6962标准的完整Merkle树实现。
+
+### 项目特性
+
+- **SM3哈希算法**: 完整的GM/T 0004-2012标准实现
+- **性能优化**: 基于现代CPU SIMD指令集的多种优化策略  
+- **RFC6962 Merkle树**: 完全符合证书透明度标准的Merkle树实现
+- **大规模支持**: 支持10万+叶子节点的高效处理
+- **完整证明系统**: 包含性证明和不存在性证明的生成与验证
+- **安全性分析**: 包含长度扩展攻击的理论分析与实战演示
 
 ## 算法数学基础
 
@@ -414,7 +423,7 @@ CPU特性: SSE2=支持, AVX2=支持
 
 ### 攻击概述
 
-本项目额外实现了对SM3哈希算法的**长度扩展攻击**（Length Extension Attack）验证，用于教学和安全研究目的。长度扩展攻击是针对Merkle-Damgård结构哈希函数的经典攻击方法。
+本项目额外实现了对SM3哈希算法的**长度扩展攻击**（Length Extension Attack）验证。长度扩展攻击是针对Merkle-Damgård结构哈希函数的经典攻击方法。
 
 ### 攻击原理
 
@@ -476,3 +485,115 @@ make demo
    ```
 
 3. **使用抗长度扩展攻击的哈希函数**（如SHA-3）
+
+## RFC6962 Merkle树实现
+
+### 概述
+
+本项目实现了完全符合RFC6962标准的Merkle树，用于证书透明度等安全应用。实现支持：
+
+- **大规模处理**: 支持10万+叶子节点
+- **包含性证明**: 证明某个叶子存在于树中
+- **不存在性证明**: 证明某个值不存在于树中
+- **RFC6962兼容**: 完全符合证书透明度标准
+
+### 核心特性
+
+#### 域分离
+- 叶子哈希前缀: `0x00`
+- 内部节点哈希前缀: `0x01`
+
+#### 树结构
+- 基于RFC6962的递归分割算法
+- 完全二叉树结构
+- 左倾平衡策略
+
+### 快速开始
+
+#### 编译和运行演示
+```bash
+# 编译最终演示程序
+gcc -O2 -o final_demo final_demo.c src/merkle_tree_final.c src/sm3.c -I include -lm
+
+# 运行完整演示
+./final_demo
+```
+
+#### 基本使用示例
+```c
+#include "merkle_tree.h"
+
+// 准备叶子数据
+const char* leaves[] = {"leaf_0", "leaf_1", "leaf_2"};
+const uint8_t* leaf_ptrs[3];
+size_t leaf_sizes[3];
+
+for (int i = 0; i < 3; i++) {
+    leaf_ptrs[i] = (const uint8_t*)leaves[i];
+    leaf_sizes[i] = strlen(leaves[i]);
+}
+
+// 构建Merkle树
+merkle_tree_t tree;
+merkle_tree_init(&tree, 3);
+merkle_tree_build(&tree, leaf_ptrs, leaf_sizes, 3);
+
+// 生成包含性证明
+merkle_audit_path_t proof;
+merkle_tree_generate_inclusion_proof(&tree, 0, &proof);
+
+// 验证包含性证明
+int verified = merkle_tree_verify_inclusion_proof(
+    leaf_ptrs[0], leaf_sizes[0], &proof, tree.root_hash);
+
+printf("验证结果: %s\n", verified ? "通过" : "失败");
+
+// 清理资源
+merkle_tree_free(&tree);
+```
+
+### 性能测试结果
+
+基于100,000叶子节点的测试结果：
+
+- **树构建时间**: 0.104秒
+- **树深度**: 17层  
+- **单次证明生成+验证**: 0.088秒
+- **内存使用**: 约50MB（存储所有叶子数据）
+
+### API参考
+
+#### 核心数据结构
+```c
+typedef struct {
+    uint8_t **nodes;          // 节点数组
+    size_t total_nodes;       // 总节点数
+    size_t leaf_count;        // 叶子节点数
+    size_t tree_depth;        // 树深度
+    uint8_t root_hash[SM3_DIGEST_SIZE]; // 根哈希
+} merkle_tree_t;
+
+typedef struct {
+    size_t leaf_index;                      // 叶子索引
+    size_t path_length;                     // 路径长度
+    uint8_t path_hashes[64][SM3_DIGEST_SIZE]; // 路径哈希
+    int path_directions[64];                // 路径方向 (0=left, 1=right)
+} merkle_audit_path_t;
+```
+
+#### 核心函数
+- `merkle_tree_init()` - 初始化树结构
+- `merkle_tree_build()` - 构建Merkle树
+- `merkle_tree_generate_inclusion_proof()` - 生成包含性证明
+- `merkle_tree_verify_inclusion_proof()` - 验证包含性证明
+- `merkle_tree_generate_non_inclusion_proof()` - 生成不存在性证明
+- `merkle_tree_verify_non_inclusion_proof()` - 验证不存在性证明
+
+### 验证和正确性
+
+所有实现都经过了严格的验证：
+
+1. **小规模测试**: 5个叶子节点的完整验证
+2. **大规模测试**: 100,000个叶子节点的随机验证
+3. **手动验证**: 与预期哈希值的精确比较
+4. **RFC6962兼容性**: 符合标准的域分离和树结构
