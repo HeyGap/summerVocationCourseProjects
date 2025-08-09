@@ -4,7 +4,7 @@ SIMD_FLAGS = -msse2 -mavx2 -march=native
 INCLUDES = -Iinclude
 
 # 基础目标
-all: build/libsm3.a build/test_sm3
+all: build/libsm3.a build/test_sm3 build/length_extension_attack build/simple_attack_demo
 
 # 优化目标
 opt: build/libsm3_opt.a build/test_sm3_opt
@@ -22,6 +22,14 @@ build/libsm3.a: build/obj/sm3.o
 build/test_sm3: test/test_sm3.c build/libsm3.a
 	mkdir -p build
 	$(CC) $(CFLAGS) $(INCLUDES) test/test_sm3.c -Lbuild -lsm3 -o build/test_sm3
+
+build/length_extension_attack: length_extension_attack.c build/libsm3.a
+	mkdir -p build
+	$(CC) $(CFLAGS) $(INCLUDES) length_extension_attack.c -Lbuild -lsm3 -o build/length_extension_attack
+
+build/simple_attack_demo: simple_attack_demo.c build/libsm3.a
+	mkdir -p build
+	$(CC) $(CFLAGS) $(INCLUDES) simple_attack_demo.c -Lbuild -lsm3 -o build/simple_attack_demo
 
 # 优化版本编译规则
 build/obj/sm3_opt.o: src/sm3_opt.c include/sm3_opt.h include/sm3.h | build/obj
@@ -51,6 +59,14 @@ build/simple_perf_test: test/simple_perf_test.c build/libsm3_opt.a
 test: build/test_sm3
 	./build/test_sm3
 
+# 长度扩展攻击演示
+attack: build/length_extension_attack
+	./build/length_extension_attack
+
+# 简化攻击演示
+demo: build/simple_attack_demo
+	./build/simple_attack_demo
+
 # 优化版本测试
 test-opt: build/test_sm3_opt
 	./build/test_sm3_opt --all
@@ -68,4 +84,4 @@ simd-info: build/test_sm3_opt
 clean:
 	rm -rf build
 
-.PHONY: all opt test test-opt benchmark simd-info clean
+.PHONY: all opt test attack demo test-opt benchmark simd-info clean

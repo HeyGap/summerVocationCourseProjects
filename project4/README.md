@@ -409,3 +409,70 @@ CPU特性: SSE2=支持, AVX2=支持
 - **小消息认证**: <1KB数据建议使用基础实现
 - **内存受限环境**: 嵌入式系统可能不需要SIMD优化
 - **实时性要求极高**: 优化选择逻辑可能引入微小延迟
+
+## 安全性研究：长度扩展攻击验证
+
+### 攻击概述
+
+本项目额外实现了对SM3哈希算法的**长度扩展攻击**（Length Extension Attack）验证，用于教学和安全研究目的。长度扩展攻击是针对Merkle-Damgård结构哈希函数的经典攻击方法。
+
+### 攻击原理
+
+SM3采用Merkle-Damgård结构，存在以下安全缺陷：
+- 如果知道 `H(message)` 和消息长度，可以计算出 `H(message || padding || extension)` 的值
+- 攻击者无需知道原始消息的内容
+- 这使得简单的 `H(secret || message)` 认证模式不安全
+
+### 演示程序
+
+#### 完整演示程序
+```bash
+make attack
+# 运行 length_extension_attack.c
+```
+
+#### 简化演示程序
+```bash
+make demo  
+# 运行 simple_attack_demo.c - 更直观易懂
+```
+
+### 攻击成功示例
+
+```
+=== SM3长度扩展攻击简化演示 ===
+
+原始消息: "user=alice&role=user"
+原始消息总长度: 34 字节 (包含秘密密钥)
+原始哈希值: da4ef386794066c2f1f070ab76cc084c...
+
+开始长度扩展攻击...
+计算填充长度: 30 字节
+从哈希值恢复内部状态
+长度扩展攻击计算的哈希值: fed2795273fb55557460fc7bb7a959ba...
+
+验证攻击结果:
+直接计算扩展消息的哈希值: fed2795273fb55557460fc7bb7a959ba...
+攻击成功! 两个哈希值完全匹配!
+
+攻击效果分析:
+   原始消息: user=alice&role=user
+   扩展后的逻辑消息: user=alice&role=user&role=admin
+   攻击者成功将用户权限从 'user' 提升到 'admin'
+```
+
+### 防御方法演示
+
+程序同时演示了多种防御长度扩展攻击的方法：
+
+1. **HMAC结构（推荐）**:
+   ```c
+   // secure_hash = H(secret || H(secret || message))
+   ```
+
+2. **后置密钥**:
+   ```c  
+   // hash = H(message || secret)
+   ```
+
+3. **使用抗长度扩展攻击的哈希函数**（如SHA-3）
